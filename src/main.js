@@ -16,14 +16,16 @@ app.innerHTML = `
       rel="noreferrer"
     >
       <strong>Want to generate high quality AI ads at scale?</strong>
-      <span>Check out ugcforge.ai</span>
+      <span>
+        Check out <span class="promo-url">ugcforge.ai</span>
+      </span>
     </a>
 
     <section class="intro">
       <h1>Hormuz Hopper</h1>
       <p class="lede">
         Frogger, except you are a lumbering oil tanker trying to cross the Strait of Hormuz while
-        speedboats, mines, destroyers, and drones turn the shipping lane into a panic attack.
+        speedboats, mines, destroyers, and drones turn the shipping lane into a panic attack. Finish level 10 to beat the game.
       </p>
       <div class="chips">
         <span>Arrow keys or WASD to move</span>
@@ -121,6 +123,8 @@ const world = {
   laneHeight: canvas.height / 9,
   colWidth: canvas.width / 8
 };
+
+const FINAL_LEVEL = 10;
 
 const colors = {
   tanker: "#f7b955",
@@ -243,7 +247,9 @@ const state = {
   player: { col: 3, row: 8 },
   lanes: [],
   highestRowReached: 8,
-  modifier: modifierPool[0]
+  modifier: modifierPool[0],
+  pendingLevel: null,
+  pausedAt: 0
 };
 
 const sessionStats = {
@@ -554,6 +560,8 @@ function resetGame(source = "button") {
   markFirstInteraction();
   state.active = true;
   state.result = "running";
+  state.pendingLevel = null;
+  state.pausedAt = 0;
   state.runSeed = Math.floor(Math.random() * 1_000_000_000);
   state.runScore = 0;
   state.startTime = performance.now();
@@ -574,6 +582,33 @@ function resetGame(source = "button") {
     run_seed: state.runSeed
   });
   trackLevelStarted(isRestart ? "restart" : "fresh_run");
+}
+
+function enterVictoryPause(nextLevel) {
+  state.active = false;
+  state.result = "won";
+  state.pendingLevel = nextLevel;
+  state.pausedAt = performance.now();
+  statusLineNode.textContent = `Level ${FINAL_LEVEL} cleared. Markets calmed. Press Continue Run or move to keep sailing.`;
+  restartButton.textContent = "Continue Run";
+}
+
+function resumeAfterVictory() {
+  if (!state.pendingLevel) {
+    return;
+  }
+
+  const pausedFor = state.pausedAt ? performance.now() - state.pausedAt : 0;
+  state.startTime += pausedFor;
+  currentRunStartedAt += pausedFor;
+  state.pausedAt = 0;
+  state.active = true;
+  state.result = "running";
+  setupLevel(state.pendingLevel);
+  state.pendingLevel = null;
+  statusLineNode.textContent = buildLevelMessage("Victory lap underway.");
+  restartButton.textContent = "Restart Run";
+  trackLevelStarted("post_victory");
 }
 
 function playerRect() {
@@ -598,6 +633,11 @@ function collide(a, b) {
 
 function movePlayer(direction) {
   if (!state.active) {
+    if (state.result === "won" && state.pendingLevel) {
+      resumeAfterVictory();
+      return;
+    }
+
     resetGame();
     return;
   }
@@ -642,8 +682,10 @@ function movePlayer(direction) {
 function finishRun(reason = "collision") {
   state.active = false;
   state.result = reason === "oil_seizure" ? "seized" : "lost";
+  state.pendingLevel = null;
+  state.pausedAt = 0;
   stopBackgroundMusic();
-  if (reason !== "oil_seizure") {
+  if (reason === "collision") {
     playExplosionSound();
   }
   sessionStats.runsCompleted += 1;
@@ -669,7 +711,7 @@ function finishRun(reason = "collision") {
   trackEvent("run_completed", {
     outcome: reason,
     level_number: state.level,
-    levels_cleared: clearedLevels,
+    levels_cleared: reason === "victory" ? state.level : clearedLevels,
     oil_price: Number(state.oilPrice.toFixed(2)),
     run_score: Math.round(state.runScore),
     time_seconds: Number(state.elapsed.toFixed(1)),
@@ -687,6 +729,17 @@ function advanceLevel() {
   });
 
   scorePoints(520 + state.level * 140);
+  if (state.level >= FINAL_LEVEL) {
+    trackEvent("victory_achieved", {
+      level_number: state.level,
+      oil_price: Number(state.oilPrice.toFixed(2)),
+      restored_price: 80,
+      run_score: Math.round(state.runScore)
+    });
+    enterVictoryPause(state.level + 1);
+    return;
+  }
+
   const nextLevel = state.level + 1;
   setupLevel(nextLevel);
   statusLineNode.textContent = buildLevelMessage("Channel crossed. Escalation continues.");
@@ -1144,6 +1197,142 @@ function drawWrappedText(text, x, y, maxWidth, lineHeight) {
   return lines.length;
 }
 
+function drawVictoryNewspaper(cardX, cardY, cardWidth, cardHeight) {
+  const paperX = cardX + 28;
+  const paperY = cardY + 22;
+  const paperWidth = cardWidth - 56;
+  const paperHeight = cardHeight - 44;
+  const gutter = 24;
+  const marketBoxWidth = 156;
+  const headlineWidth = paperWidth - marketBoxWidth - gutter * 3;
+  const headlineX = paperX + 28;
+  const headlineY = paperY + 84;
+  const marketX = paperX + paperWidth - marketBoxWidth - 28;
+  const marketY = paperY + 70;
+  const articleTop = paperY + 214;
+  const footerY = paperY + paperHeight - 42;
+  const leftColumnWidth = 220;
+  const rightColumnX = headlineX + leftColumnWidth + 28;
+  const rightColumnWidth = paperWidth - 56 - leftColumnWidth - 28;
+
+  ctx.fillStyle = "#efe2c5";
+  ctx.beginPath();
+  ctx.roundRect(paperX, paperY, paperWidth, paperHeight, 24);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(104, 77, 36, 0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = "#5c4830";
+  ctx.font = "700 15px 'SFMono-Regular', Menlo, monospace";
+  ctx.fillText("THE HORMUZ HERALD", paperX + 28, paperY + 34);
+  ctx.fillText("EXTRA", paperX + paperWidth - 78, paperY + 34);
+
+  ctx.strokeStyle = "rgba(104, 77, 36, 0.35)";
+  ctx.beginPath();
+  ctx.moveTo(paperX + 24, paperY + 48);
+  ctx.lineTo(paperX + paperWidth - 24, paperY + 48);
+  ctx.stroke();
+
+  ctx.fillStyle = "#1f1a14";
+  ctx.font = "700 28px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
+  drawWrappedText("Hero Tanker Captain Restores Oil Order", headlineX, headlineY, headlineWidth, 26);
+
+  ctx.fillStyle = "#5c4830";
+  ctx.font = "600 13px 'SFMono-Regular', Menlo, monospace";
+  drawWrappedText(
+    `Hormuz crossing complete after level ${FINAL_LEVEL}. Markets stop screaming, insurers rediscover optimism, and one absurdly calm captain becomes front-page material.`,
+    headlineX,
+    paperY + 138,
+    headlineWidth,
+    16
+  );
+
+  ctx.fillStyle = "#d5c6a7";
+  ctx.beginPath();
+  ctx.roundRect(marketX, marketY, marketBoxWidth, 118, 14);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(104, 77, 36, 0.25)";
+  ctx.stroke();
+
+  ctx.fillStyle = "#1f1a14";
+  ctx.font = "700 12px 'SFMono-Regular', Menlo, monospace";
+  ctx.fillText("OIL CALMS", marketX + 18, marketY + 24);
+  ctx.font = "700 24px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
+  ctx.fillText("$80.00", marketX + 18, marketY + 102);
+
+  ctx.strokeStyle = "rgba(77, 123, 91, 0.55)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(marketX + 18, marketY + 42);
+  ctx.lineTo(marketX + 46, marketY + 58);
+  ctx.lineTo(marketX + 74, marketY + 56);
+  ctx.lineTo(marketX + 102, marketY + 74);
+  ctx.lineTo(marketX + 130, marketY + 92);
+  ctx.stroke();
+
+  ctx.fillStyle = "#3f3324";
+  ctx.font = "700 11px 'SFMono-Regular', Menlo, monospace";
+  ctx.fillText("LEAD STORY", headlineX, articleTop);
+  ctx.fillText("OTHER PANICS", rightColumnX, articleTop);
+
+  ctx.font = "700 17px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
+  ctx.fillStyle = "#1f1a14";
+  drawWrappedText("Freight Desks Reopen Tabs They Closed in Fear", headlineX, articleTop + 20, leftColumnWidth, 17);
+
+  ctx.fillStyle = "#3f3324";
+  ctx.font = "400 12px 'Avenir Next', 'Segoe UI', sans-serif";
+  drawWrappedText(
+    "Brokers say the lane looks respectable again after the captain threaded a crossing everyone else called 'uninsurable theatre.' Tanker memes now rally faster than crude futures.",
+    headlineX,
+    articleTop + 56,
+    leftColumnWidth,
+    15
+  );
+
+  ctx.strokeStyle = "rgba(104, 77, 36, 0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(rightColumnX - 14, articleTop + 6);
+  ctx.lineTo(rightColumnX - 14, footerY - 12);
+  ctx.stroke();
+
+  ctx.fillStyle = "#1f1a14";
+  ctx.font = "700 15px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
+  drawWrappedText("Admirals Furious That Civilians Keep Winning the Headline", rightColumnX, articleTop + 18, rightColumnWidth, 15);
+  ctx.fillStyle = "#3f3324";
+  ctx.font = "400 12px 'Avenir Next', 'Segoe UI', sans-serif";
+  drawWrappedText(
+    "Multiple fleets reportedly asked whether they too could be credited for the rescue. Markets declined comment.",
+    rightColumnX,
+    articleTop + 50,
+    rightColumnWidth,
+    15
+  );
+
+  ctx.strokeStyle = "rgba(104, 77, 36, 0.16)";
+  ctx.beginPath();
+  ctx.moveTo(rightColumnX, articleTop + 86);
+  ctx.lineTo(paperX + paperWidth - 28, articleTop + 86);
+  ctx.stroke();
+
+  ctx.fillStyle = "#1f1a14";
+  ctx.font = "700 15px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
+  drawWrappedText("Think Tank Rebrands Hesitation as a Maritime Doctrine", rightColumnX, articleTop + 108, rightColumnWidth, 15);
+  ctx.fillStyle = "#3f3324";
+  ctx.font = "400 12px 'Avenir Next', 'Segoe UI', sans-serif";
+  drawWrappedText(
+    "Experts insist the weeks of chaos were actually a stress test for supply chains, confidence, and everyone’s blood pressure.",
+    rightColumnX,
+    articleTop + 140,
+    rightColumnWidth,
+    15
+  );
+
+}
+
 function drawLabels() {
   ctx.fillStyle = colors.text;
   ctx.font = "700 14px 'SFMono-Regular', Menlo, monospace";
@@ -1151,10 +1340,12 @@ function drawLabels() {
   ctx.fillText(state.modifier.name.toUpperCase(), 24, laneTop(8) + 30);
 
   if (!state.active) {
-    const cardX = 72;
-    const cardY = state.result === "seized" ? 214 : 228;
-    const cardWidth = canvas.width - 144;
-    const cardHeight = state.result === "seized" ? 254 : 226;
+    const isSeized = state.result === "seized";
+    const isWon = state.result === "won";
+    const cardX = isWon ? 54 : 72;
+    const cardY = isSeized ? 214 : isWon ? 144 : 228;
+    const cardWidth = isWon ? canvas.width - 108 : canvas.width - 144;
+    const cardHeight = isSeized ? 254 : isWon ? 432 : 226;
 
     ctx.fillStyle = "rgba(5, 16, 28, 0.9)";
     ctx.beginPath();
@@ -1164,13 +1355,18 @@ function drawLabels() {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.fillStyle = state.result === "seized" ? "rgba(255, 174, 125, 0.14)" : "rgba(139, 247, 208, 0.08)";
+    if (isWon) {
+      drawVictoryNewspaper(cardX, cardY, cardWidth, cardHeight);
+      return;
+    }
+
+    ctx.fillStyle = isSeized ? "rgba(255, 174, 125, 0.14)" : "rgba(139, 247, 208, 0.08)";
     ctx.beginPath();
     ctx.roundRect(cardX + 18, cardY + 18, cardWidth - 36, 38, 18);
     ctx.fill();
 
     const textX = cardX + 34;
-    const textColumnWidth = state.result === "seized" ? 270 : cardWidth - 68;
+    const textColumnWidth = isSeized ? 270 : cardWidth - 68;
     const imageWidth = 164;
     const imageHeight = 198;
     const imageX = cardX + cardWidth - imageWidth - 28;
@@ -1178,16 +1374,16 @@ function drawLabels() {
 
     ctx.fillStyle = "#f4efe3";
     ctx.font = "700 34px 'Avenir Next Condensed', 'Helvetica Neue', sans-serif";
-    ctx.fillText(state.result === "seized" ? "Tanker Seized" : state.result === "lost" ? "Run Sunk" : "Escalation Awaits", textX, cardY + 92);
+    ctx.fillText(isSeized ? "Tanker Seized" : state.result === "lost" ? "Run Sunk" : "Escalation Awaits", textX, cardY + 92);
     ctx.font = "600 13px 'SFMono-Regular', Menlo, monospace";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = state.result === "seized" ? "rgba(255, 185, 122, 0.9)" : "rgba(139, 247, 208, 0.84)";
-    ctx.fillText(state.result === "seized" ? "WHITE HOUSE HOTLINE" : "SHIPPING BRIEF", textX, cardY + 37);
+    ctx.fillStyle = isSeized ? "rgba(255, 185, 122, 0.9)" : "rgba(139, 247, 208, 0.84)";
+    ctx.fillText(isSeized ? "WHITE HOUSE HOTLINE" : "SHIPPING BRIEF", textX, cardY + 37);
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = "#f4efe3";
     ctx.font = "400 18px 'Avenir Next', 'Segoe UI', sans-serif";
     const body =
-      state.result === "seized"
+      isSeized
         ? `Oil hit ${formatPrice(state.oilPrice)}. Trump called to seize the tanker before you could clear the lane.`
         : state.result === "lost"
         ? `Best score ${bestRun}. Start again for a new lane mix and a cleaner crossing.`
@@ -1198,7 +1394,7 @@ function drawLabels() {
     const promptY = Math.min(cardY + cardHeight - 28, cardY + 128 + lines * 26 + 24);
     ctx.fillText("Press Start Run or move to begin.", textX, promptY);
 
-    if (state.result === "seized" && trumpImage.complete) {
+    if (isSeized && trumpImage.complete) {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(imageX, imageY, imageWidth, imageHeight, 22);
@@ -1270,6 +1466,11 @@ document.querySelectorAll("[data-move]").forEach((button) => {
 
 restartButton.addEventListener("click", () => {
   markFirstInteraction();
+  if (state.result === "won" && state.pendingLevel) {
+    resumeAfterVictory();
+    return;
+  }
+
   if (state.active || state.result !== "idle") {
     sessionStats.restartClicks += 1;
     trackEvent("restart_clicked", {

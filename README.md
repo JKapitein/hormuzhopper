@@ -29,5 +29,6 @@ Tracked events:
 - `hazard_hit`
 - `oil_limit_hit`
 - `level_completed`
+- `victory_achieved`
 - `run_completed`
 - `page_session_summary`

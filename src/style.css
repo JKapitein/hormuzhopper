@@ -312,6 +312,13 @@ h1 {
   line-height: 1.25;
 }
 
+.promo-url {
+  color: #ffd07b;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.14em;
+}
+
 .promo-tag {
   display: inline-flex;
   align-items: center;
