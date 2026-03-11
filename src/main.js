@@ -1,6 +1,8 @@
 import "./style.css";
 import { initAnalytics, trackEvent } from "./analytics.js";
 import trumpPoster from "./img/trump.png";
+import backgroundTrack from "./bg-arcade-electronix.mp3";
+import explosionTrack from "./explosion.mp3";
 
 const app = document.querySelector("#app");
 
@@ -21,9 +23,9 @@ app.innerHTML = `
         <article class="brief-card">
           <span class="brief-label">Enemy Brief</span>
           <div class="brief-list">
-            <div class="brief-item"><span class="swatch mine"></span><div><strong>Mines</strong><p>Slow, dense lane blockers that punish hesitation.</p></div></div>
-            <div class="brief-item"><span class="swatch boat"></span><div><strong>Speedboats</strong><p>Fast skirmish craft that force quick lateral reads.</p></div></div>
-            <div class="brief-item"><span class="swatch ship"></span><div><strong>Destroyers</strong><p>Big hulls that erase your margin for error.</p></div></div>
+            <div class="brief-item"><span class="swatch mine"></span><div><strong>Iranian Mines</strong><p>Slow, dense lane blockers that punish hesitation.</p></div></div>
+            <div class="brief-item"><span class="swatch boat"></span><div><strong>Iranian Speedboats</strong><p>Fast skirmish craft that force quick lateral reads.</p></div></div>
+            <div class="brief-item"><span class="swatch ship"></span><div><strong>U.S. Destroyers</strong><p>Big hulls that erase your margin for error.</p></div></div>
             <div class="brief-item"><span class="swatch drone"></span><div><strong>Drones</strong><p>Diagonal flyers with awkward, drifting hit paths.</p></div></div>
           </div>
         </article>
@@ -31,10 +33,6 @@ app.innerHTML = `
     </section>
 
     <section class="game-wrap">
-      <div class="board-topline">
-        <span class="board-kicker">Shipping Lane Control</span>
-        <span class="board-alert" id="threatTag">Level 1 · Open Water</span>
-      </div>
       <div class="hud">
         <div class="stat">
           <span class="label">Oil Panic</span>
@@ -60,7 +58,10 @@ app.innerHTML = `
 
       <div class="statusbar">
         <p id="statusLine">Each crossing escalates the crisis. Clear lanes, bank score, survive the next level.</p>
-        <button id="restartButton" class="primary">Start Run</button>
+        <div class="status-actions">
+          <button id="muteButton" class="secondary" type="button" aria-pressed="false">Sound On</button>
+          <button id="restartButton" class="primary" type="button">Start Run</button>
+        </div>
       </div>
 
       <div class="controls" aria-label="Touch controls">
@@ -83,11 +84,21 @@ const oilPriceNode = document.querySelector("#oilPrice");
 const currentLevelNode = document.querySelector("#currentLevel");
 const runScoreNode = document.querySelector("#runScore");
 const bestRunNode = document.querySelector("#bestRun");
-const threatTagNode = document.querySelector("#threatTag");
 const statusLineNode = document.querySelector("#statusLine");
+const muteButton = document.querySelector("#muteButton");
 const restartButton = document.querySelector("#restartButton");
 const trumpImage = new Image();
 trumpImage.src = trumpPoster;
+const backgroundAudio = new Audio(backgroundTrack);
+backgroundAudio.preload = "auto";
+backgroundAudio.loop = true;
+backgroundAudio.volume = 0.55;
+backgroundAudio.load();
+const explosionAudio = new Audio(explosionTrack);
+explosionAudio.preload = "auto";
+explosionAudio.volume = 0.72;
+explosionAudio.load();
+let isMuted = localStorage.getItem("hh-audio-muted") === "true";
 
 const world = {
   cols: 8,
@@ -240,6 +251,7 @@ let currentRunStartedAt = 0;
 
 setupLevel(1);
 updateHud();
+updateMuteButton();
 
 function mulberry32(seed) {
   return function random() {
@@ -275,7 +287,45 @@ function updateHud() {
   currentLevelNode.textContent = `${state.level}`;
   runScoreNode.textContent = `${Math.round(state.runScore)}`;
   bestRunNode.textContent = `${bestRun}`;
-  threatTagNode.textContent = `Level ${state.level} · ${state.modifier.name}`;
+}
+
+function updateMuteButton() {
+  muteButton.textContent = isMuted ? "Muted" : "Sound On";
+  muteButton.setAttribute("aria-pressed", String(isMuted));
+}
+
+async function playBackgroundMusic() {
+  if (isMuted) {
+    return;
+  }
+
+  if (!backgroundAudio.paused && !backgroundAudio.ended) {
+    return;
+  }
+
+  try {
+    await backgroundAudio.play();
+  } catch {
+    // Ignore autoplay restrictions until the next user gesture.
+  }
+}
+
+function stopBackgroundMusic() {
+  backgroundAudio.pause();
+}
+
+function playExplosionSound() {
+  if (isMuted) {
+    return;
+  }
+
+  try {
+    explosionAudio.pause();
+    explosionAudio.currentTime = 0;
+    explosionAudio.play();
+  } catch {
+    // Ignore playback failures until the next user gesture.
+  }
 }
 
 function markFirstInteraction() {
@@ -497,6 +547,7 @@ function resetGame(source = "button") {
   state.oilPrice = 80;
   setupLevel(1);
   updateHud();
+  playBackgroundMusic();
   sessionStats.runsStarted += 1;
   statusLineNode.textContent = buildLevelMessage("Convoy underway.");
   restartButton.textContent = "Restart Run";
@@ -519,10 +570,10 @@ function playerRect() {
 }
 
 function playerSpriteRect() {
-  const width = world.colWidth * 0.94;
-  const height = world.laneHeight * 0.66;
+  const width = world.colWidth * 0.58;
+  const height = world.laneHeight * 0.88;
   const x = state.player.col * world.colWidth + (world.colWidth - width) / 2;
-  const y = laneTop(state.player.row) + world.laneHeight * 0.16;
+  const y = laneTop(state.player.row) + world.laneHeight * 0.06;
   return { x, y, width, height };
 }
 
@@ -576,6 +627,10 @@ function movePlayer(direction) {
 function finishRun(reason = "collision") {
   state.active = false;
   state.result = reason === "oil_seizure" ? "seized" : "lost";
+  stopBackgroundMusic();
+  if (reason !== "oil_seizure") {
+    playExplosionSound();
+  }
   sessionStats.runsCompleted += 1;
   sessionStats.lastOutcome = reason;
   sessionStats.maxRunScore = Math.max(sessionStats.maxRunScore, Math.round(state.runScore));
@@ -738,18 +793,6 @@ function drawBackdrop() {
     ctx.lineTo(canvas.width, y + world.laneHeight - 1);
     ctx.stroke();
 
-    if (lane.type !== "goal" && lane.type !== "start") {
-      ctx.save();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([18, 12]);
-      ctx.lineDashOffset = -state.elapsed * (36 + row * 3) * (row % 2 === 0 ? 1 : -1);
-      ctx.beginPath();
-      ctx.moveTo(118, y + world.laneHeight / 2);
-      ctx.lineTo(canvas.width - 118, y + world.laneHeight / 2);
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   ctx.fillStyle = "rgba(143, 211, 255, 0.18)";
@@ -798,67 +841,86 @@ function drawTankerSprite(player) {
   const bottom = player.y + player.height;
   const left = player.x;
   const right = player.x + player.width;
+  const hullWidth = player.width;
+  const bowY = top + player.height * 0.03;
+  const sternY = bottom - player.height * 0.04;
+  const deckLeft = centerX - hullWidth * 0.23;
+  const deckRight = centerX + hullWidth * 0.23;
 
-  drawSoftShadow(centerX, bottom + 10, player.width, player.height, 0.4);
+  drawSoftShadow(centerX, bottom + 10, player.width, player.height, 0.34);
 
   if (state.active) {
-    ctx.strokeStyle = "rgba(143, 211, 255, 0.26)";
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(143, 211, 255, 0.24)";
+    ctx.lineWidth = 2;
     for (let wake = 0; wake < 3; wake += 1) {
-      const offset = wake * 11 + ((state.elapsed * 44) % 12);
+      const offset = wake * 10 + ((state.elapsed * 44) % 10);
       ctx.beginPath();
-      ctx.moveTo(centerX - player.width * 0.16, bottom + offset);
-      ctx.lineTo(centerX - player.width * 0.34, bottom + offset + 18);
-      ctx.moveTo(centerX + player.width * 0.16, bottom + offset);
-      ctx.lineTo(centerX + player.width * 0.34, bottom + offset + 18);
+      ctx.moveTo(centerX - hullWidth * 0.08, bottom + offset);
+      ctx.lineTo(centerX - hullWidth * 0.26, bottom + offset + 16);
+      ctx.moveTo(centerX + hullWidth * 0.08, bottom + offset);
+      ctx.lineTo(centerX + hullWidth * 0.26, bottom + offset + 16);
       ctx.stroke();
     }
   }
 
-  const hull = ctx.createLinearGradient(left, top, right, bottom);
-  hull.addColorStop(0, "#ffe0a0");
-  hull.addColorStop(0.5, "#f7b955");
-  hull.addColorStop(1, "#b56f2f");
+  const hull = ctx.createLinearGradient(left, top, right, top);
+  hull.addColorStop(0, "#b87230");
+  hull.addColorStop(0.18, "#efbf72");
+  hull.addColorStop(0.5, "#ffd993");
+  hull.addColorStop(0.82, "#efbf72");
+  hull.addColorStop(1, "#b87230");
   ctx.fillStyle = hull;
   ctx.beginPath();
-  ctx.moveTo(centerX, top);
-  ctx.lineTo(right - player.width * 0.14, top + player.height * 0.18);
-  ctx.lineTo(right - player.width * 0.08, bottom - player.height * 0.18);
-  ctx.lineTo(centerX + player.width * 0.16, bottom);
-  ctx.lineTo(centerX - player.width * 0.16, bottom);
-  ctx.lineTo(left + player.width * 0.08, bottom - player.height * 0.18);
-  ctx.lineTo(left + player.width * 0.14, top + player.height * 0.18);
+  ctx.moveTo(centerX, bowY);
+  ctx.lineTo(centerX + hullWidth * 0.27, top + player.height * 0.14);
+  ctx.lineTo(centerX + hullWidth * 0.34, top + player.height * 0.52);
+  ctx.lineTo(centerX + hullWidth * 0.24, sternY);
+  ctx.lineTo(centerX - hullWidth * 0.24, sternY);
+  ctx.lineTo(centerX - hullWidth * 0.34, top + player.height * 0.52);
+  ctx.lineTo(centerX - hullWidth * 0.27, top + player.height * 0.14);
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(52, 33, 15, 0.35)";
+  ctx.strokeStyle = "rgba(70, 40, 14, 0.45)";
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  ctx.fillStyle = "#1f2936";
+  ctx.fillStyle = "#f4e5c3";
   ctx.beginPath();
-  ctx.roundRect(centerX - player.width * 0.22, top + player.height * 0.15, player.width * 0.44, player.height * 0.22, 8);
+  ctx.roundRect(deckLeft, top + player.height * 0.18, deckRight - deckLeft, player.height * 0.56, 8);
   ctx.fill();
 
-  ctx.fillStyle = "#2f3c4b";
+  ctx.fillStyle = "#d9c49b";
   ctx.beginPath();
-  ctx.roundRect(centerX - player.width * 0.13, top + player.height * 0.44, player.width * 0.26, player.height * 0.14, 7);
+  ctx.roundRect(centerX - hullWidth * 0.1, top + player.height * 0.2, hullWidth * 0.2, player.height * 0.5, 6);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(255, 245, 224, 0.88)";
-  ctx.beginPath();
-  ctx.roundRect(centerX - player.width * 0.075, top + player.height * 0.47, player.width * 0.15, player.height * 0.08, 4);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
-  ctx.lineWidth = 1.5;
-  for (let stripe = 0; stripe < 3; stripe += 1) {
-    const y = top + player.height * (0.62 + stripe * 0.09);
+  ctx.strokeStyle = "rgba(87, 61, 26, 0.3)";
+  ctx.lineWidth = 1.2;
+  for (let stripe = 0; stripe < 4; stripe += 1) {
+    const y = top + player.height * (0.28 + stripe * 0.11);
     ctx.beginPath();
-    ctx.moveTo(centerX - player.width * 0.24, y);
-    ctx.lineTo(centerX + player.width * 0.24, y);
+    ctx.moveTo(deckLeft + hullWidth * 0.04, y);
+    ctx.lineTo(deckRight - hullWidth * 0.04, y);
     ctx.stroke();
   }
+
+  ctx.fillStyle = "#2c3642";
+  ctx.beginPath();
+  ctx.roundRect(centerX - hullWidth * 0.16, bottom - player.height * 0.24, hullWidth * 0.32, player.height * 0.15, 6);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(227, 241, 255, 0.9)";
+  ctx.beginPath();
+  ctx.roundRect(centerX - hullWidth * 0.09, bottom - player.height * 0.205, hullWidth * 0.18, player.height * 0.05, 4);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(centerX, top + player.height * 0.16);
+  ctx.lineTo(centerX, bottom - player.height * 0.12);
+  ctx.stroke();
 }
 
 function drawMineSprite(rect) {
@@ -1075,9 +1137,9 @@ function drawLabels() {
 
   if (!state.active) {
     const cardX = 72;
-    const cardY = state.result === "seized" ? 214 : 238;
+    const cardY = state.result === "seized" ? 214 : 228;
     const cardWidth = canvas.width - 144;
-    const cardHeight = state.result === "seized" ? 254 : 210;
+    const cardHeight = state.result === "seized" ? 254 : 226;
 
     ctx.fillStyle = "rgba(5, 16, 28, 0.9)";
     ctx.beginPath();
@@ -1115,10 +1177,11 @@ function drawLabels() {
         : state.result === "lost"
         ? `Best score ${bestRun}. Start again for a new lane mix and a cleaner crossing.`
         : "Each level shuffles hazards and market panic.";
-    const lines = drawWrappedText(body, textX, cardY + 128, textColumnWidth, 28);
+    const lines = drawWrappedText(body, textX, cardY + 128, textColumnWidth, 26);
     ctx.fillStyle = "rgba(244, 239, 227, 0.8)";
     ctx.font = "500 16px 'Avenir Next', 'Segoe UI', sans-serif";
-    ctx.fillText("Press Start Run or move to begin.", textX, cardY + 128 + lines * 28 + 30);
+    const promptY = Math.min(cardY + cardHeight - 28, cardY + 128 + lines * 26 + 24);
+    ctx.fillText("Press Start Run or move to begin.", textX, promptY);
 
     if (state.result === "seized" && trumpImage.complete) {
       ctx.save();
@@ -1203,16 +1266,34 @@ restartButton.addEventListener("click", () => {
   resetGame("button");
 });
 
+muteButton.addEventListener("click", async () => {
+  isMuted = !isMuted;
+  localStorage.setItem("hh-audio-muted", String(isMuted));
+  updateMuteButton();
+
+  if (isMuted) {
+    stopBackgroundMusic();
+  } else if (state.active) {
+    await playBackgroundMusic();
+  }
+
+  trackEvent("audio_toggled", {
+    muted: isMuted
+  });
+});
+
 trackEvent("page_loaded", {
   page_title: document.title,
   experience: "hormuz_hopper"
 });
 
 window.addEventListener("pagehide", () => {
+  stopBackgroundMusic();
   sendSessionSummary("pagehide");
 });
 
 window.addEventListener("beforeunload", () => {
+  stopBackgroundMusic();
   sendSessionSummary("beforeunload");
 });
 

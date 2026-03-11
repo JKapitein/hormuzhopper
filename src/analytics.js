@@ -1,6 +1,6 @@
 const DEBUG_PREFIX = "[analytics]";
 const hasWindow = typeof window !== "undefined";
-const measurementId = hasWindow ? window.HORMUZ_HOPPER_GA_ID || import.meta.env.VITE_GA_MEASUREMENT_ID : "";
+const measurementId = hasWindow ? "G-HKTW6SB3QT" : "";
 
 function ensureDataLayer() {
   if (!hasWindow) {
@@ -39,7 +39,7 @@ export function initAnalytics() {
   ensureDataLayer();
 
   if (!measurementId) {
-    console.info(`${DEBUG_PREFIX} GA4 disabled. Set VITE_GA_MEASUREMENT_ID to enable tracking.`);
+    console.info(`${DEBUG_PREFIX} GA4 disabled.`);
     return;
   }
 

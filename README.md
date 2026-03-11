@@ -14,10 +14,10 @@ npm run dev
 Cloudflare Pages support:
 
 - GA4 works fine on Cloudflare Pages.
-- Set `VITE_GA_MEASUREMENT_ID` in a local `.env` file, or add the same variable in the Cloudflare Pages project settings.
+- The GA4 measurement ID is currently hardcoded in `src/analytics.js` for this deploy path.
 - Cloudflare Web Analytics can still be enabled separately in the dashboard if you want basic visitor/pageview reporting, but the gameplay event tracking here is GA4-only.
 
-The app sends custom events through `gtag` when `VITE_GA_MEASUREMENT_ID` is configured.
+The app sends custom events through `gtag` using the hardcoded GA4 measurement ID in `src/analytics.js`.
 
 Tracked events:
 
