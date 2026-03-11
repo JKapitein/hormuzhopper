@@ -787,7 +787,7 @@ function update(dt) {
   const player = playerRect();
 
   for (const hazard of lane.hazards) {
-    const rect = hazardRect(lane, hazard);
+    const rect = collisionRect(lane, hazard);
     if (collide(player, rect)) {
       trackEvent("hazard_hit", {
         lane_number: state.player.row,
@@ -810,6 +810,24 @@ function hazardRect(lane, hazard) {
     y: baseY + drift,
     width: hazard.width,
     height: hazard.height
+  };
+}
+
+function collisionRect(lane, hazard) {
+  const rect = hazardRect(lane, hazard);
+
+  if (hazard.type !== "mine") {
+    return rect;
+  }
+
+  const hitWidth = rect.width * 0.44;
+  const hitHeight = rect.height * 0.72;
+
+  return {
+    x: rect.x + (rect.width - hitWidth) / 2,
+    y: rect.y + (rect.height - hitHeight) / 2,
+    width: hitWidth,
+    height: hitHeight
   };
 }
 
