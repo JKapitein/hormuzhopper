@@ -78,6 +78,7 @@ select {
   .shell {
     display: grid;
     grid-template-columns: minmax(240px, 292px) minmax(700px, 840px);
+    grid-template-rows: minmax(0, 1fr) auto;
     justify-content: center;
     gap: 10px;
     height: 100vh;
@@ -115,9 +116,13 @@ select {
   .intro {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     min-height: 0;
     padding: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 211, 247, 0.26) transparent;
   }
 }
 
@@ -148,6 +153,27 @@ select {
 
   .brief-card {
     padding: 10px;
+  }
+
+  .brief-toggle {
+    padding: 10px;
+  }
+
+  .brief-card-collapsible .brief-list {
+    padding: 0 10px 10px;
+  }
+
+  .promo-box {
+    margin-top: 0;
+    padding: 9px 10px;
+  }
+
+  .promo-box strong {
+    font-size: 0.8rem;
+  }
+
+  .promo-box span:last-child {
+    font-size: 0.72rem;
   }
 
   .brief-label {
@@ -241,10 +267,110 @@ h1 {
   margin-top: 16px;
 }
 
+.promo-box {
+  display: grid;
+  gap: 4px;
+  margin-top: 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(247, 185, 85, 0.16);
+  border-radius: 16px;
+  color: var(--text);
+  text-decoration: none;
+  background:
+    linear-gradient(180deg, rgba(247, 185, 85, 0.08), transparent),
+    rgba(7, 19, 31, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+@media (min-width: 980px) {
+  .intro {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .promo-box {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    padding: 9px 10px;
+  }
+
+  .game-wrap {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+.promo-box strong {
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+}
+
+.promo-box span:last-child {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.promo-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #1a1d21;
+  background: linear-gradient(135deg, #f7b955, #ffd07b);
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .brief-card {
   position: relative;
   padding: 14px;
   border-radius: 18px;
+}
+
+.brief-card-collapsible {
+  padding: 0;
+}
+
+.brief-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.brief-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.brief-caret {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--accent-alt);
+  border-bottom: 2px solid var(--accent-alt);
+  transform: rotate(45deg);
+  transition: transform 140ms ease;
+  flex-shrink: 0;
+}
+
+.brief-card-collapsible[open] .brief-caret {
+  transform: rotate(225deg);
+}
+
+.brief-card-collapsible .brief-label {
+  margin-bottom: 0;
+}
+
+.brief-card-collapsible .brief-list {
+  padding: 0 14px 14px;
 }
 
 .brief-label {
@@ -620,16 +746,21 @@ canvas {
   }
 
   .game-wrap {
-    order: 1;
+    order: 2;
     padding: 12px;
     border-radius: 24px;
   }
 
   .intro {
-    order: 2;
+    order: 3;
     margin-top: 12px;
     padding: 20px 16px;
     border-radius: 24px;
+  }
+
+  .promo-box {
+    order: 1;
+    margin-bottom: 12px;
   }
 
   .board-topline {
@@ -698,6 +829,10 @@ canvas {
 
   .briefing-grid {
     margin-top: 14px;
+  }
+
+  .promo-box {
+    margin-top: 0;
   }
 }
 

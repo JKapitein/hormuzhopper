@@ -8,6 +8,17 @@ const app = document.querySelector("#app");
 
 app.innerHTML = `
   <main class="shell">
+    <a
+      id="promoLink"
+      class="promo-box"
+      href="https://ugcforge.ai/?utm_source=hormuzhopper&utm_medium=referral&utm_campaign=sidebar_promo"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <strong>Want to generate high quality AI ads at scale?</strong>
+      <span>Check out ugcforge.ai</span>
+    </a>
+
     <section class="intro">
       <h1>Hormuz Hopper</h1>
       <p class="lede">
@@ -20,15 +31,18 @@ app.innerHTML = `
         <span>Oil spikes higher the longer you stall</span>
       </div>
       <div class="briefing-grid">
-        <article class="brief-card">
-          <span class="brief-label">Enemy Brief</span>
+        <details class="brief-card brief-card-collapsible">
+          <summary class="brief-toggle">
+            <span class="brief-label">Enemy Brief</span>
+            <span class="brief-caret" aria-hidden="true"></span>
+          </summary>
           <div class="brief-list">
             <div class="brief-item"><span class="swatch mine"></span><div><strong>Iranian Mines</strong><p>Slow, dense lane blockers that punish hesitation.</p></div></div>
             <div class="brief-item"><span class="swatch boat"></span><div><strong>Iranian Speedboats</strong><p>Fast skirmish craft that force quick lateral reads.</p></div></div>
             <div class="brief-item"><span class="swatch ship"></span><div><strong>U.S. Destroyers</strong><p>Big hulls that erase your margin for error.</p></div></div>
             <div class="brief-item"><span class="swatch drone"></span><div><strong>Drones</strong><p>Diagonal flyers with awkward, drifting hit paths.</p></div></div>
           </div>
-        </article>
+        </details>
       </div>
     </section>
 
@@ -87,6 +101,7 @@ const bestRunNode = document.querySelector("#bestRun");
 const statusLineNode = document.querySelector("#statusLine");
 const muteButton = document.querySelector("#muteButton");
 const restartButton = document.querySelector("#restartButton");
+const promoLink = document.querySelector("#promoLink");
 const trumpImage = new Image();
 trumpImage.src = trumpPoster;
 const backgroundAudio = new Audio(backgroundTrack);
@@ -1279,6 +1294,14 @@ muteButton.addEventListener("click", async () => {
 
   trackEvent("audio_toggled", {
     muted: isMuted
+  });
+});
+
+promoLink.addEventListener("click", () => {
+  trackEvent("promo_clicked", {
+    promo_id: "ugcforge_sidebar",
+    destination_host: "ugcforge.ai",
+    placement: "sidebar"
   });
 });
 
